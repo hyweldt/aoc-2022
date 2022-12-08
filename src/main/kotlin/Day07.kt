@@ -64,6 +64,19 @@ data class Node(val name: String, val size: Long, val children: MutableList<Node
         }
         return dirs
     }
+
+    fun findDirectoriesLargerThanOrEqual(deltaRequired: Long): List<Node> {
+        val nodes = mutableListOf<Node>()
+        for (c in children.filter { it.isDir() }) {
+            val childSize = c.calculateSize()
+            if (childSize >= deltaRequired) {
+                nodes += c
+                nodes += c.findDirectoriesLargerThanOrEqual(deltaRequired)
+            }
+        }
+        return nodes
+
+    }
 }
 
 data class Model(
@@ -157,4 +170,13 @@ fun main() {
     val smallDirs = model.rootNode.findDirectoriesSmallerThanOrEqual(100_000).toMutableList()
     val total = smallDirs.sumOf { it.calculateSize() }
     println(total)
+    val requiredSpace = 30_000_000
+    val totalSpace = 70_000_000
+    val usedSpace = model.rootNode.calculateSize()
+    val freeSpace = totalSpace - usedSpace
+    val deltaRequired = requiredSpace - freeSpace
+    println("Need $deltaRequired")
+    val foldersGreaterThanDelta = model.rootNode.findDirectoriesLargerThanOrEqual(deltaRequired)
+    val smallest = foldersGreaterThanDelta.minByOrNull { it.calculateSize() }
+    println(smallest?.calculateSize())
 }
