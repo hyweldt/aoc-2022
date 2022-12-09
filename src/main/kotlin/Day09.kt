@@ -60,7 +60,7 @@ fun maxOf(y: Y, y2: Y): Y {
     return Y(maxOf(y.int, y2.int))
 }
 
-class KnotTravel() {
+class KnotTravel {
     //grid co-ordinates of visited tiles
     private var headPos = X(0) to Y(0)
     private var tailPos = headPos
@@ -69,6 +69,15 @@ class KnotTravel() {
         headPos = headPos.translate(command.delta)
         moveTail()
 //        printBoard()
+    }
+
+    fun setHead(head: Pair<X, Y>) {
+        headPos = head
+        moveTail()
+    }
+
+    fun getTail(): Pair<X, Y> {
+        return tailPos
     }
 
     private fun moveTail() {
@@ -142,13 +151,16 @@ fun followCommands(input: String) {
     val commands = input.lines().filterNot { it.isBlank() }.flatMap {
         parseCommands(it)
     }
-    KnotTravel().let { model ->
-        commands.forEach {
-            model.moveHead(it)
+    val knots = Array(9) { KnotTravel() }
+    commands.forEach {
+        knots[0].moveHead(it)
+        var nextHead = knots[0].getTail()
+        knots.drop(1).forEach { model ->
+            model.setHead(nextHead)
+            nextHead = model.getTail()
         }
-        println(model.uniqueTiles())
     }
-
+    println(knots.last().uniqueTiles())
 }
 
 fun main() {
