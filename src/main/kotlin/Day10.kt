@@ -50,13 +50,45 @@ class Cpu {
     }
 }
 
+class Crt(private val cpu: Cpu) {
+    private var currentCycle = 1
+    private val buffer: MutableList<Char> = mutableListOf()
+    private fun render(): Char {
+        val pos = cpu.x
+        val rowOffset = (currentCycle -1) % 40
+            if (rowOffset == pos || rowOffset == pos - 1 || rowOffset == pos + 1) {
+            return '#'
+        }
+        return '.'
+    }
+
+    private fun print() {
+        buffer.chunked(40).forEach { line ->
+            println(line.joinToString(""))
+        }
+    }
+
+    private fun tick() {
+        val nextChar = render()
+        buffer += nextChar
+        currentCycle += 1
+    }
+
+    fun run() {
+        do {
+            this.tick()
+        } while (cpu.tick())
+        this.print()
+    }
+}
+
 fun parseCommands(string: String, cpu: Cpu) {
     val lines = string.lines().filterNot { it.isBlank() }
     lines.forEach {
         val instr = it.split(" ")
         if (instr[0] == "noop") {
             cpu.noop()
-        } else if(instr[0] == "addx") {
+        } else if (instr[0] == "addx") {
             cpu.addX(instr[1].toInt())
         }
     }
@@ -220,5 +252,6 @@ fun main() {
     val input = Utils.readResource("10.txt")
     val cpu = Cpu()
     parseCommands(input, cpu)
-    cpu.run()
+    val crt = Crt(cpu)
+    crt.run()
 }
