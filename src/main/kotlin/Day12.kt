@@ -15,7 +15,7 @@ data class Cell(
     val char: Char,
     val height: Int,
     var distanceFromStart: Int,
-    val distanceFromEnd: Int,
+    var distanceFromEnd: Int,
 ) {
     override fun toString(): String {
         return "[$char ${height.toString().padStart(2, '0')} $distanceFromStart $distanceFromEnd]"
@@ -91,12 +91,28 @@ data class Grid(
         return false
     }
 
-    fun solve() {
+    fun solve(startPosition: Pair<Int, Int>): Int {
         stepOut(startPosition.first, startPosition.second)
+        return g[endPosition.first][endPosition.second].distanceFromStart
     }
 
     fun describe(): String {
         return "$startPosition -> $endPosition"
+    }
+
+    fun find(c: Char): List<Cell> {
+        return g.flatMap { row ->
+            row.filter { it.char == c }
+        }
+    }
+
+    fun reset() {
+        g.forEach { row ->
+            row.forEach { cell ->
+                cell.distanceFromStart = -1
+                cell.distanceFromEnd = -1
+            }
+        }
     }
 }
 
@@ -135,8 +151,18 @@ fun parseGrid(s: String): Grid {
 
 fun main() {
     val grid = parseGrid(Utils.readResource("12.txt"))
+//    val grid = parseGrid(example)
     println(grid.describe())
-    grid.solve()
-    println(grid.toCharAndDistanceFromStart())
-    grid.g[grid.endPosition.first][grid.endPosition.second].distanceFromStart.also { println(it) }
+    //Part 1
+//    grid.solve(grid.startPosition)
+    //Part 2
+    grid.find('a').map {
+        grid.reset()
+        it.distanceFromStart = 0
+        val s = grid.solve(it.index)
+        println(grid.toCharAndDistanceFromStart())
+        println()
+        s
+    }.filterNot { it == -1 }.minOrNull().also { println(it) }
+//    println(grid.toCharAndDistanceFromStart())
 }
