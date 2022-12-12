@@ -1,4 +1,4 @@
-import java.math.BigInteger
+import kotlin.math.roundToLong
 import kotlin.math.sqrt
 
 val example = """
@@ -31,29 +31,9 @@ val example = """
         If false: throw to monkey 1
 """.trimIndent()
 
-val primesUntilRoot = { i: BigInteger ->
-    val rt = i.sqrt()
-    sequence {
-        if (rt > 2.toBigInteger()) {
-            yield(2L)
-        }
-        if (rt > 3.toBigInteger()) {
-            yield(3L)
-        }
-        if (rt > 3.toBigInteger()) {
-            yield(3L)
-        }
-        var x = 1L
-        while ((6 * x).toBigInteger() < rt) {
-            val base = x * 6
-            yield(base - 1)
-            yield(base + 1)
-            x += 1
-        }
-    }
-}
+const val logging = false
 
-const val logging = true
+const val reliefLevel = 1L
 
 fun log(s: String) {
     if (logging) {
@@ -61,67 +41,70 @@ fun log(s: String) {
     }
 }
 
-fun factorise(i: BigInteger, factors: MutableMap<Long, Int>) {
-    if (i == BigInteger.ONE) {
+val primeCandidatesUntil = { n: Long ->
+    sequence<Long> {
+        if (n > 2L) {
+            yield(2L)
+        }
+        if (n > 3L) {
+            yield(3L)
+        }
+        var x = 1
+        while (6L * x - 1 < n) {
+            yield((6L * x) - 1)
+            yield((6L * x) + 1)
+            x += 1
+        }
+    }
+}
+
+fun factorise(i: Long, factors: MutableSet<Long>) {
+    if (i == 1L) {
         return
     }
     var factored = false
-    for (v in primesUntilRoot(i)) {
-        val vBigInt = v.toBigInteger()
-        if (i.mod(vBigInt) == BigInteger.ZERO) {
+    //TODO more efficient prime checks
+    for (v in primeCandidatesUntil(sqrt(i.toDouble()).roundToLong())) {
+        if (i % v == 0L) {
             factored = true
-            factors.merge(v, 1) { a, b ->
-                a + b
-            }
-            factorise(i / vBigInt, factors)
+            factors.add(v)
+            factorise(i / v, factors)
             break
         }
     }
     if (!factored) {
-        factors.merge(i.toLong(), 1) { a, b -> a + b }
+        //i must be prime
+        factors.add(i)
     }
 }
 
-fun factorise(i: Int): Map<Long, Int> {
-    val factors = mutableMapOf<Long, Int>()
-    factorise(i.toBigInteger(), factors)
+fun factorise(i: Long): Set<Long> {
+    val factors = mutableSetOf<Long>()
+    factorise(i, factors)
     return factors
 }
 
-class WorryLevel(initialLevel: Int) {
-    private var level: Int = initialLevel
-    private var factors = factorise(initialLevel).toMutableMap()
-    private var additions = 0
-    private var additionFactors = mutableMapOf<Long, Int>()
-    private val partsFactors = mutableListOf<MutableSet<Long>>()
+class WorryLevel(val initialLevel: Long, val mod: Long) {
+    var level = initialLevel % mod
 
-    fun dividesBy(divisor: Int): Boolean {
-        return factorise(divisor).keys.all {
-            factors.containsKey(it) && (additions == 0 || additionFactors.containsKey(it))
-        }
+    fun dividesBy(divisor: Long): Boolean {
+        return level % divisor == 0L
     }
 
-    fun add(n: Int) {
-        log(" + $n")
-        additions += n
-        additionFactors.clear()
-        factorise(n.toBigInteger(), additionFactors)
+    fun add(n: Long) {
+        level = (level + n) % mod
     }
 
-    fun multiply(n: Int) {
-        log(" * $n")
-        factorise(n.toBigInteger(), factors)
-    }
-
-    override fun toString(): String {
-        return "Worrylevel(initialLevel=$level factors=$factors additions=$additions)"
+    fun multiply(n: Long) {
+        level = (level * n) % mod
     }
 
     fun square() {
-        log(" ^ 2")
-        factors.entries.forEach {
-            it.setValue(it.value * 2)
-        }
+        multiply(level)
+    }
+
+    override fun toString(): String {
+        return "WorryLevel ${initialLevel} now: ${level}"
     }
 }
 
@@ -144,13 +127,17 @@ data class Monkey(
         val swaps = mutableListOf<Pair<Int, Item>>()
         this.items.forEach { item ->
             doInspect(item)
-//            applyRelief(item)
+            applyRelief(item)
             val targetMonkey = test(item)
             log("Item with worrylevel ${item.worryLevel} is thrown to monkey $targetMonkey")
             swaps.add(targetMonkey to item)
         }
         this.items.clear()
         return swaps
+    }
+
+    private fun applyRelief(item: Item) {
+        item.worryLevel.level = item.worryLevel.level / reliefLevel
     }
 }
 
@@ -167,20 +154,27 @@ fun runRound(monkeys: List<Monkey>) {
 
 fun parseMonkeys(string: String): List<Monkey> {
     val monkeys = mutableListOf<Monkey>()
+    //Get modulo
+    var modulo = string.lines().filter { it.trim().startsWith("Test:") }
+        .map {
+            val (divisible, by, divisor) = "\\s+Test: (.*)".toRegex().matchEntire(it)!!.groupValues[1].split(" ")
+            divisor.toLong()
+        }.fold(1L) { a, b -> a * b }.also { println("Modulo: $it") }
+
     var lines = string.lines().dropWhile { it.isBlank() }
     while (lines.isNotEmpty()) {
         val monkey = lines.takeWhile { it.isNotBlank() }
-        monkeys.add(parseMonkey(monkey))
+        monkeys.add(parseMonkey(monkey, modulo))
         lines = lines.drop(monkey.size).dropWhile { it.isBlank() }
     }
     return monkeys
 }
 
-fun parseMonkey(monkey: List<String>): Monkey {
+fun parseMonkey(monkey: List<String>, modulo: Long): Monkey {
     val monkeyId = "^Monkey (\\d+):$".toRegex().matchEntire(monkey[0])!!.groupValues[1].toInt()
     val items: List<Item> =
         "\\s+Starting items: (.*)$".toRegex().matchEntire(monkey[1])!!.groupValues[1].split(", ")
-            .map { Item(WorryLevel(it.toInt())) }
+            .map { Item(WorryLevel(it.toLong(), modulo)) }
     val operation: (Item) -> Unit = parseOperation(monkey[2])
     val (test, divisor) = parseTest(monkey[3], monkey[4], monkey[5])
     return Monkey(monkeyId, items.toMutableList(), operation, test, divisor)
@@ -196,7 +190,7 @@ fun parseTest(testString: String, ifTrueString: String, ifFalseString: String): 
     val ifFalseMonkey =
         "\\s+ If false: throw to monkey (\\d+)".toRegex().matchEntire(ifFalseString)!!.groupValues[1].toInt()
     val fn = { item: Item ->
-        val divides = item.worryLevel.dividesBy(divisor.toInt())
+        val divides = item.worryLevel.dividesBy(divisor.toLong())
         if (divides) {
             log("${item.worryLevel} divides by $divisor")
             ifTrueMonkey
@@ -217,7 +211,7 @@ fun parseOperation(s: String): (Item) -> Unit {
             if (operand == "old") {
                 old.worryLevel.multiply(2)
             } else {
-                old.worryLevel.add(operand.toInt())
+                old.worryLevel.add(operand.toLong())
             }
         }
 
@@ -225,7 +219,7 @@ fun parseOperation(s: String): (Item) -> Unit {
             if (operand == "old") {
                 old.worryLevel.square()
             } else {
-                old.worryLevel.multiply(operand.toInt())
+                old.worryLevel.multiply(operand.toLong())
             }
         }
 
@@ -238,13 +232,16 @@ fun parseOperation(s: String): (Item) -> Unit {
 fun main() {
     val monkeys = parseMonkeys(example)
 //    val monkeys = parseMonkeys(Utils.readResource("11.txt"))
-    repeat(20) {
+    repeat(10_000) {
         runRound(monkeys)
-//        if (it % 100 == 0) {
-        println(it)
-//        }
+        if (it in listOf(0, 19, 1000, 2000)) {
+            println("=======${it + 1}========")
+            monkeys.forEach {
+                println("${it.id} -> ${it.inspectCount}")
+            }
+            println("===============")
+        }
     }
     val monkeyBusiness = monkeys.sortedByDescending { it.inspectCount }.take(2).map { it.inspectCount }
     println(monkeyBusiness[0] * monkeyBusiness[1]) //should be 2713310158
-//    println(primesUntilRoot(700.toBigInteger()).toList())
 }
