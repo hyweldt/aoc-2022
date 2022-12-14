@@ -67,23 +67,8 @@ fun parseList(iterator: Iterator<Char>): Type.ListType {
     }
 }
 
-fun parse(input: String) {
-    val pairs = input.lines().filterNot { it.isBlank() }.chunked(2)
-    var sum = 0
-    pairs.forEachIndexed { i, (a, b) ->
-        val adjustedIndex = i + 1
-        val aType = parseList(a.iterator().also { it.next() })
-        val bType = parseList(b.iterator().also { it.next() })
-        println("a: $aType")
-        println("b: $bType")
-        if (areOrdered(aType, bType)) {
-            println("$adjustedIndex Ordered")
-            sum += adjustedIndex
-        } else {
-            println("$adjustedIndex Unordered")
-        }
-        println("Sum: $sum")
-    }
+fun parse(input: String): List<Type.ListType> {
+    return input.lines().filterNot { it.isBlank() }.map { parseList(it.iterator().also { it.next() }) }
 }
 
 fun compare(t1: Type, t2: Type): Int {
@@ -121,5 +106,16 @@ fun areOrdered(aType: Type.ListType, bType: Type.ListType): Boolean {
 fun main() {
 //    val iterator = "[[8],[1,2,3]]".iterator().also { it.next() }
 //    parseList(iterator).also { println(it) }
-    parse(Utils.readResource("13.txt"))
+
+    val dividerPackets = listOf("[[2]]", "[[6]]").map { parseList(it.iterator().also { it.next() }) }
+    val file = Utils.readResource("13.txt")
+    val pairs = parse(file) + dividerPackets
+    var mul = 1
+    val sorted = pairs.sortedWith(::compare).also { println(it.joinToString("\n")) }
+    sorted.forEachIndexed { index, listType ->
+        if (compare(listType, dividerPackets[0]) == 0 || compare(listType, dividerPackets[1]) == 0) {
+            mul *= (index + 1)
+        }
+    }
+    println(mul)
 }
