@@ -1,16 +1,42 @@
 package day14
 
+import kotlin.math.absoluteValue
+
 typealias TwoDArray<T> = Array<Array<T>>
 
 class Grid(val minCol: Int, val maxCol: Int, val minRow: Int, val maxRow: Int) {
-    private val numRows = maxRow - minRow + 1
+    private val numRows = maxRow - minRow + 1 + 2 //floor below
     private val numCols = maxCol - minCol + 1
     private val grid = TwoDArray(numRows) {
         Array(numCols) { Tile.Air }
     }
+    private val overflowLeft = mutableListOf<Array<Tile>>()
+    private val overflowRight = mutableListOf<Array<Tile>>()
+
+    init {
+        for (x in minCol..maxCol) {
+            set(x, maxRow + 2, Tile.Rock)
+        }
+    }
 
     fun set(x: Int, y: Int, tile: Tile) {
-        grid[y - minRow][x - minCol] = tile
+        val normalisedY = y - minRow
+        val normalisedX = x - minCol
+        if (normalisedX < 0) {
+            val overflowIndex = normalisedX.absoluteValue - 1
+            if (overflowLeft.size < overflowIndex) {
+                overflowLeft.add(Array(numRows) { i -> if (i == numRows - 1) Tile.Rock else Tile.Air })
+            }
+            overflowLeft[overflowIndex][normalisedY] = tile
+        } else if (normalisedX >= numCols) {
+            val overflowIndex = normalisedX - numCols
+            if (overflowRight.size < overflowIndex) {
+                overflowRight.add(Array(numRows) { i -> if (i == numRows - 1) Tile.Rock else Tile.Air })
+            }
+            overflowRight[overflowIndex][normalisedY] = tile
+        } else {
+            grid[normalisedY][normalisedX] = tile
+        }
     }
 
     fun draw() {
@@ -25,8 +51,22 @@ class Grid(val minCol: Int, val maxCol: Int, val minRow: Int, val maxRow: Int) {
     private fun tileAt(x: Int, y: Int): Tile {
         val normalisedRow = y - minRow
         val normalisedCol = x - minCol
-        if (normalisedRow < 0 || normalisedRow >= numRows || normalisedCol < 0 || normalisedCol >= numCols) {
-            return Tile.Void
+        if (normalisedRow == numRows - 1) {
+            return Tile.Rock
+        }
+        if (normalisedCol < 0) {
+            val overflowIndex = normalisedCol.absoluteValue - 1
+            if (overflowLeft.size <= overflowIndex) {
+                overflowLeft.add(Array(numRows) { i -> if (i == numRows - 1) Tile.Rock else Tile.Air })
+            }
+            return overflowLeft[overflowIndex][normalisedRow]
+        } else if (normalisedCol >= numCols) {
+            val overflowIndex = normalisedCol - numCols
+            if (overflowRight.size <= overflowIndex) {
+                overflowRight.add(Array(numRows) { i -> if (i == numRows - 1) Tile.Rock else Tile.Air })
+            }
+            return overflowRight[overflowIndex][normalisedRow]
+
         }
         return grid[normalisedRow][normalisedCol]
     }
@@ -70,6 +110,9 @@ class Grid(val minCol: Int, val maxCol: Int, val minRow: Int, val maxRow: Int) {
                 break
             }
             tryMove?.let { nextPos = it }
+        }
+        if(nextPos.first == 500 && nextPos.second == 0) {
+            return true
         }
         set(nextPos.first, nextPos.second, Tile.Sand)
         return false
@@ -151,5 +194,5 @@ fun main() {
         iterations += 1
     }
     grid.draw()
-    println(iterations - 1)
+    println(iterations )
 }
